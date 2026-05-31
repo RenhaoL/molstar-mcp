@@ -23,16 +23,24 @@ This project fills that gap.
 `molstar-mcp` is a local [MCP](https://modelcontextprotocol.io) server that lets Claude Desktop drive a [Mol*](https://molstar.org) 3D structure viewer with plain English. The viewer runs in a browser tab — nothing to install beyond the server itself.
 
 ```mermaid
-flowchart LR
-    U(["👤 Researcher\nplain English"])
-    CD["🖥️ Claude Desktop\nMCP client"]
-    S["⚙️ server.py\nMCP server · scene state\nMVS JSON builder"]
-    V["🌐 index.html\nMol* viewer\nin your browser"]
+sequenceDiagram
+    actor R as 👤 Researcher
+    participant CD as 🖥️ Claude Desktop
+    participant S as ⚙️ server.py
+    participant V as 🌐 Mol* Viewer
 
-    U -->|chat| CD
-    CD -->|"stdio · tool calls"| S
-    S -->|"WebSocket :8765\nMVSJ scene JSON"| V
-    V -->|renders| U
+    R->>CD: "Load 6W41, hide chains H and L,<br/>highlight Omicron mutation sites in blue"
+    CD->>S: load_protein("6w41") · stdio
+    S-->>V: MVSJ scene · WebSocket
+    V-->>R: Structure appears in browser
+
+    CD->>S: hide_chain("H"), hide_chain("L")
+    S-->>V: Updated MVSJ scene
+    V-->>R: Antibody chains disappear
+
+    CD->>S: highlight_residue_list([339, 417, 501 …])
+    S-->>V: Updated MVSJ scene
+    V-->>R: Mutation sites highlighted in blue
 ```
 
 The server maintains a scene state, converts it into a [MolViewSpec](https://molstar.org/mol-view-spec-docs/) (MVSJ) scene on every change, and pushes it over a WebSocket. The browser receives it and redraws — no Mol* internals touched.

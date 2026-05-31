@@ -302,3 +302,9 @@ async def my_tool(param: str) -> str:
 ```
 
 Register it in `tools.py`. `build_scene()` in `scene.py` is the only place that reads STATE to produce output — update it there if the new tool needs a new visual element.
+
+---
+
+## License
+
+This project is licensed under the [MIT License](LICENSE).

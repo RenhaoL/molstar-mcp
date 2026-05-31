@@ -44,10 +44,18 @@
     <button id="btn-record">Record 5s Video</button>
     <div id="record-indicator">● Recording…</div>
   </div>
+  <div id="status-bar" style="
+    position:absolute; top:10px; left:10px; z-index:10;
+    background:rgba(0,0,0,0.65); color:#eee; font-size:12px;
+    padding:4px 10px; border-radius:4px; font-family:monospace;
+    pointer-events:none;">
+    Initialising…
+  </div>
   <script>
     const { MVSData, loadMVS } = molstar.PluginExtensions.mvs;
+    const statusBar = document.getElementById('status-bar');
+    function setStatus(msg) { statusBar.textContent = msg; }
 
-    // preserveDrawingBuffer is required for canvas.captureStream() to work on WebGL
     molstar.Viewer
       .create('app', {
         layoutIsExpanded: false,
@@ -55,6 +63,7 @@
         canvas3dContext: { webgl: { preserveDrawingBuffer: true } },
       })
       .then(viewer => {
+        setStatus('Viewer ready — waiting for connection');
 
         // ── Screenshot ──────────────────────────────────────────────────
         function doScreenshot() {
@@ -160,14 +169,60 @@
           a.click();
         }
 
-        // ── WebSocket ───────────────────────────────────────────────────
+        // ── Scene queue ─────────────────────────────────────────────────
+        // Problem: loadMVS takes 2-5s (downloads the CIF). If a second scene
+        // arrives while the first is still loading (e.g. hide_chain right after
+        // load_protein), two concurrent loadMVS calls corrupt the viewer state.
+        //
+        // Fix — two-layer protection:
+        //   1. Debounce (400ms): batch rapid consecutive messages (e.g. the
+        //      empty-clear + real-structure pair from load_protein) into one call.
+        //   2. Serialize: if loadMVS is already running when the next scene fires,
+        //      hold it until the current load finishes, then apply the latest.
+        let isApplying = false;
+        let latestRaw = null;
+        let debounceTimer = null;
+
+        async function applyScene(raw) {
+          isApplying = true;
+          latestRaw = null;
+          setStatus('Loading scene…');
+          try {
+            const scene = MVSData.fromMVSJ(raw);
+            setStatus('Fetching structure from PDB…');
+            await loadMVS(viewer.plugin, scene, { replaceExisting: true });
+            setStatus('Ready ✓');
+          } catch (e) {
+            setStatus('Error: ' + e.message);
+            console.error('[molstar-mcp] loadMVS error:', e);
+          }
+          isApplying = false;
+          // If a newer scene arrived while we were loading, apply it now.
+          if (latestRaw) {
+            const next = latestRaw;
+            latestRaw = null;
+            await applyScene(next);
+          }
+        }
+
+        function scheduleScene(raw) {
+          latestRaw = raw;
+          if (isApplying) return; // applyScene will pick up latestRaw when done
+          clearTimeout(debounceTimer);
+          debounceTimer = setTimeout(() => {
+            const data = latestRaw;
+            latestRaw = null;
+            if (data) applyScene(data);
+          }, 400);
+        }
+
         function connect() {
           const ws = new WebSocket('ws://localhost:8765');
-          ws.onopen = () => console.log('[molstar-mcp] connected');
-          ws.onclose = () => { console.log('[molstar-mcp] disconnected, retrying in 2s…'); setTimeout(connect, 2000); };
+          ws.onopen = () => { console.log('[molstar-mcp] connected'); setStatus('Connected — waiting for structure'); };
+          ws.onclose = () => { console.log('[molstar-mcp] disconnected, retrying in 2s…'); setStatus('Disconnected — retrying…'); setTimeout(connect, 2000); };
           ws.onerror = e => console.error('[molstar-mcp] ws error', e);
 
-          ws.onmessage = async (msg) => {
+          ws.onmessage = (msg) => {
             let data;
             try { data = JSON.parse(msg.data); } catch { return; }
 
@@ -181,12 +236,7 @@
                 case 'download_text': downloadText(data.content, data.filename); break;
               }
             } else {
-              try {
-                const scene = MVSData.fromMVSJ(msg.data);
-                await loadMVS(viewer.plugin, scene, { replaceExisting: true });
-              } catch (e) {
-                console.error('[molstar-mcp] loadMVS error:', e);
-              }
+              scheduleScene(msg.data);
             }
           };
         }

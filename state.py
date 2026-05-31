@@ -12,7 +12,7 @@ STATE: dict = {
     "pdb_id": None,
     "show_water": True,
     "representation": "cartoon",  # polymer representation type
-    "color_scheme": "Chainbow",  # CSS color, hex, or MVS scheme name
+    "color_scheme": "lightgray",  # CSS color or hex only — MVS v1.8 scheme names not supported by molstar 5.x
     "background": "white",
     "highlights": [],  # [{selector: dict (auth_* keys), color, representation}]
     "distances": [],  # [{chain1, res1, chain2, res2, color, label_size}]

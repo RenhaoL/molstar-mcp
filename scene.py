@@ -9,6 +9,21 @@ from molviewspec import create_builder
 
 from state import POLYMER_TYPES, STATE
 
+# Distinct CSS colors assigned to polymer chains when rendered individually.
+# All are valid in MVS v1 (plain CSS named colors — no scheme names).
+_CHAIN_PALETTE = [
+    "cornflowerblue",
+    "salmon",
+    "mediumseagreen",
+    "goldenrod",
+    "orchid",
+    "tomato",
+    "steelblue",
+    "sandybrown",
+    "mediumturquoise",
+    "indianred",
+]
+
 
 def build_scene() -> str:
     """Rebuild the complete MVS scene from STATE and return it as a JSON string."""
@@ -26,14 +41,23 @@ def build_scene() -> str:
     hidden = set(STATE["hidden_chains"])
     chains = STATE["chains"]
 
-    # Gray out the base structure when highlights are active so only the
-    # highlighted residues carry color.
-    base_color = "lightgray" if STATE["highlights"] else STATE["color_scheme"]
+    # Determine the base polymer color:
+    #   None       → use per-chain palette (distinct colors, no highlights active)
+    #   "lightgray" → gray base (highlights are active, so only highlights carry color)
+    #   other str  → explicit color chosen by the user via color_by()
+    if STATE["highlights"]:
+        base_color: str | None = "lightgray"
+    elif STATE["color_scheme"] == "lightgray":
+        base_color = None  # sentinel: assign palette colors per chain
+    else:
+        base_color = STATE["color_scheme"]
 
-    if hidden and chains:
+    if chains:
+        # Per-chain rendering: distinct palette colors per chain, enables hide_chain.
+        # Falls back to bulk only when chain metadata is unavailable.
         _render_per_chain(s, chains, hidden, base_color)
     else:
-        _render_bulk(s, base_color)
+        _render_bulk(s, base_color or "lightgray")
 
     _render_highlights(s)
     _render_primitives(s)
@@ -48,6 +72,7 @@ def _render_per_chain(s, chains: list, hidden: set, base_color: str) -> None:
     """Render each visible chain individually (used when chains are hidden)."""
     rendered: set = set()
     polymer_chain_ids = {c["auth_id"] for c in chains if c["type"] in POLYMER_TYPES}
+    palette_idx = 0  # cycles through _CHAIN_PALETTE for polymer chains
 
     for c in chains:
         cid = c["auth_id"]
@@ -63,9 +88,16 @@ def _render_per_chain(s, chains: list, hidden: set, base_color: str) -> None:
         mol_type = c["type"]
 
         if mol_type in POLYMER_TYPES:
+            # None sentinel → assign palette color; any string → use it directly
+            color = (
+                _CHAIN_PALETTE[palette_idx % len(_CHAIN_PALETTE)]
+                if base_color is None
+                else base_color
+            )
+            palette_idx += 1
             s.component(selector=sel).representation(
                 type=STATE["representation"]
-            ).color(color=base_color)
+            ).color(color=color)
         elif mol_type == "water":
             if STATE["show_water"]:
                 s.component(selector=sel).representation(type="ball_and_stick")

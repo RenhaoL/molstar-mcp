@@ -47,7 +47,7 @@ async def load_protein(pdb_id: str) -> str:
         pdb_id=pid,
         show_water=True,
         representation="cartoon",
-        color_scheme="Chainbow",
+        color_scheme="lightgray",
         background="white",
         highlights=[],
         distances=[],
@@ -174,8 +174,8 @@ async def color_by(scheme: str) -> str:
     """
     Color the polymer by a named scheme or solid color.
 
-    Built-in schemes: 'ElementSymbol', 'Chainbow', 'SecondaryStructure', 'ResidueName'.
-    Or any CSS color name (e.g. 'steelblue') or hex string (e.g. '#ff6600').
+    Use any CSS color name (e.g. 'steelblue', 'lightgray') or hex string (e.g. '#ff6600').
+    Note: MVS named schemes like 'Chainbow' require a newer Mol* version and are not currently supported.
     """
     STATE["color_scheme"] = scheme
     await broadcast()
@@ -453,7 +453,7 @@ async def reset_view() -> str:
     STATE.update(
         show_water=True,
         representation="cartoon",
-        color_scheme="Chainbow",
+        color_scheme="lightgray",
         background="white",
         highlights=[],
         distances=[],

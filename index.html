@@ -1,0 +1,194 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Mol* MCP viewer</title>
+  <script src="https://cdn.jsdelivr.net/npm/molstar@latest/build/viewer/molstar.js"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/molstar@latest/build/viewer/molstar.css" />
+  <style>
+    #controls {
+      position: absolute;
+      bottom: 10px;
+      right: 10px;
+      z-index: 10;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      align-items: flex-end;
+    }
+    #controls button {
+      padding: 6px 12px;
+      background: rgba(0,0,0,0.6);
+      color: white;
+      border: 1px solid rgba(255,255,255,0.3);
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 13px;
+    }
+    #controls button:hover { background: rgba(0,0,0,0.85); }
+    #record-indicator {
+      display: none;
+      padding: 4px 10px;
+      background: rgba(200,0,0,0.75);
+      color: white;
+      border-radius: 4px;
+      font-size: 12px;
+      text-align: center;
+    }
+  </style>
+</head>
+<body style="margin:0">
+  <div id="app" style="position:absolute; inset:0;"></div>
+  <div id="controls">
+    <button id="btn-screenshot">Save Image</button>
+    <button id="btn-record">Record 5s Video</button>
+    <div id="record-indicator">● Recording…</div>
+  </div>
+  <script>
+    const { MVSData, loadMVS } = molstar.PluginExtensions.mvs;
+
+    // preserveDrawingBuffer is required for canvas.captureStream() to work on WebGL
+    molstar.Viewer
+      .create('app', {
+        layoutIsExpanded: false,
+        layoutShowControls: false,
+        canvas3dContext: { webgl: { preserveDrawingBuffer: true } },
+      })
+      .then(viewer => {
+
+        // ── Screenshot ──────────────────────────────────────────────────
+        function doScreenshot() {
+          const canvas = viewer.plugin.canvas3d?.webgl?.gl?.canvas;
+          if (!canvas) { console.warn('canvas not ready'); return; }
+          canvas.toBlob(blob => {
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'molstar-view.png';
+            a.click();
+            URL.revokeObjectURL(url);
+          });
+        }
+        document.getElementById('btn-screenshot').addEventListener('click', doScreenshot);
+
+        // ── Video recording ─────────────────────────────────────────────
+        let mediaRecorder = null;
+
+        function doRecord(durationMs) {
+          if (mediaRecorder) return;
+          const canvas = viewer.plugin.canvas3d?.webgl?.gl?.canvas;
+          if (!canvas) { console.warn('canvas not ready'); return; }
+
+          const stream = canvas.captureStream(30);
+          const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9')
+            ? 'video/webm;codecs=vp9' : 'video/webm';
+          mediaRecorder = new MediaRecorder(stream, { mimeType });
+          const chunks = [];
+
+          mediaRecorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
+          mediaRecorder.onstop = () => {
+            const blob = new Blob(chunks, { type: 'video/webm' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'molstar-movie.webm';
+            a.click();
+            URL.revokeObjectURL(url);
+            mediaRecorder = null;
+            document.getElementById('record-indicator').style.display = 'none';
+          };
+
+          mediaRecorder.start(100);
+          document.getElementById('record-indicator').style.display = 'block';
+          setTimeout(() => mediaRecorder?.stop(), durationMs);
+        }
+        document.getElementById('btn-record').addEventListener('click', () => doRecord(5000));
+
+        // ── Spin ────────────────────────────────────────────────────────
+        let spinRafId = null;
+
+        function setSpin(on) {
+          const canvas3d = viewer.plugin.canvas3d;
+          if (!canvas3d) return;
+          try {
+            const tb = JSON.parse(JSON.stringify(canvas3d.props.trackball ?? {}));
+            tb.animate = on
+              ? { name: 'spin', params: { speed: 1 } }
+              : { name: 'off', params: {} };
+            canvas3d.setProps({ trackball: tb });
+          } catch (e) {
+            console.warn('trackball spin failed, using rAF fallback:', e);
+            if (on) {
+              if (spinRafId) return;
+              const plugin = viewer.plugin;
+              function step() {
+                const cam = plugin.canvas3d?.camera;
+                if (cam) {
+                  const angle = 0.005;
+                  const { position, target, up } = cam.state;
+                  const dx = position[0] - target[0], dz = position[2] - target[2];
+                  const cos = Math.cos(angle), sin = Math.sin(angle);
+                  cam.setState({
+                    position: [target[0] + dx*cos - dz*sin, position[1], target[2] + dx*sin + dz*cos],
+                    up, target,
+                  });
+                }
+                spinRafId = requestAnimationFrame(step);
+              }
+              spinRafId = requestAnimationFrame(step);
+            } else {
+              if (spinRafId) { cancelAnimationFrame(spinRafId); spinRafId = null; }
+            }
+          }
+        }
+
+        // ── Download helpers ────────────────────────────────────────────
+        function downloadUrl(url, filename) {
+          fetch(url).then(r => r.blob()).then(blob => {
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = filename;
+            a.click();
+          }).catch(e => console.error('download failed:', e));
+        }
+
+        function downloadText(content, filename) {
+          const blob = new Blob([content], { type: 'application/json' });
+          const a = document.createElement('a');
+          a.href = URL.createObjectURL(blob);
+          a.download = filename;
+          a.click();
+        }
+
+        // ── WebSocket ───────────────────────────────────────────────────
+        function connect() {
+          const ws = new WebSocket('ws://localhost:8765');
+          ws.onopen = () => console.log('[molstar-mcp] connected');
+          ws.onclose = () => { console.log('[molstar-mcp] disconnected, retrying in 2s…'); setTimeout(connect, 2000); };
+          ws.onerror = e => console.error('[molstar-mcp] ws error', e);
+
+          ws.onmessage = async (msg) => {
+            let data;
+            try { data = JSON.parse(msg.data); } catch { return; }
+
+            if (data.type === 'control') {
+              switch (data.action) {
+                case 'spin_start':     setSpin(true); break;
+                case 'spin_stop':      setSpin(false); break;
+                case 'screenshot':     doScreenshot(); break;
+                case 'record_start':   doRecord(data.duration_ms ?? 5000); break;
+                case 'download_file':  downloadUrl(data.url, data.filename); break;
+                case 'download_text':  downloadText(data.content, data.filename); break;
+              }
+            } else {
+              const scene = MVSData.fromMVSJ(msg.data);
+              await loadMVS(viewer.plugin, scene, { replaceExisting: true });
+            }
+          };
+        }
+
+        connect();
+      });
+  </script>
+</body>
+</html>

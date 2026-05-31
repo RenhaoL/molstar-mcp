@@ -51,7 +51,7 @@ The server maintains a scene state, converts it into a [MolViewSpec](https://mol
 
 This is the workflow we demoed at the hackathon. Starting from Omicron variant mutations identified through genomic analysis:
 
-> *"Load structure 6W41. Hide the antibody chains H and L. Highlight the Omicron variant mutation sites on chain C in blue: 339, 356, 371, 373, 375, 376, 403, 405, 408, 417, 435, 440, 445, 446, 450, 452, 455, 456, 460, 477, 481, 484, 486, 493, 498, 501, 505. Measure the distance between residue 501 and 505. Start spinning, record a 6 second video, then stop spinning."*
+> *"Load structure 6W41. Hide the antibody chains H and L. Highlight the Omicron variant mutation sites on chain C in blue: 339, 356, 371, 373, 375, 376, 403, 405, 408, 417, 435, 440, 445, 446, 450, 452, 455, 456, 460, 477, 481, 484, 486, 493, 498, 501, 505. Measure the distance between residue 501 and 505."*
 
 One prompt. Claude loads the SARS-CoV-2 RBD structure, hides the irrelevant chains, marks every mutation site, draws a distance measurement, and records a rotating video — all without the user touching the viewer.
 

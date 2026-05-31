@@ -12,7 +12,7 @@ Modern LLM-powered research workflows are getting good at the 1D layer of biolog
 
 But the readout is always a list. Residue 501. N501Y. Chain C. Numbers on a page.
 
-What happens to those mutations in **3D space** is a completely different question — and one that has historically required a trained structural biologist, a dedicated software install (PyMOL, ChimeraX), and a lot of clicking. That gap — between "here are the mutations" and "here is what they look like on the folded protein" — is one that LLM workflows have largely skipped over.
+What happens to those mutations in **3D space** is a completely different question — and one that has historically required a trained structural biologist, a dedicated software install (PyMOL, ChimeraX), and a lot of clicking. That gap — between "here are the mutations" and "here is what they look like on the folded protein" — is one that LLM workflows have largely skipped over. The reason this step got skipped isn't that 3D doesn't matter — it's that the tools to see it were never built for a conversation. They assume a human at a keyboard who already knows the software. The insight here is that the barrier was never the science; it was the interface. Make structural visualization speakable, and the 3D step can finally take its place alongside every other skill in an LLM workflow.
 
 This project fills that gap.
 

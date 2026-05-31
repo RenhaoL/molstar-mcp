@@ -55,6 +55,12 @@ async def load_protein(pdb_id: str) -> str:
         chains=[],
         hidden_chains=[],
     )
+    # Broadcast an empty scene first so Mol* fully unloads any existing structure
+    # before the new one arrives. fetch_chain_info takes a moment anyway, which
+    # gives the browser time to process the clear before the real scene lands.
+    await broadcast()
+
+    STATE["pdb_id"] = pid
     chains, _ = await api.fetch_chain_info(pid)
     STATE["chains"] = chains
 

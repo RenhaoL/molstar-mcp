@@ -173,16 +173,20 @@
 
             if (data.type === 'control') {
               switch (data.action) {
-                case 'spin_start':     setSpin(true); break;
-                case 'spin_stop':      setSpin(false); break;
-                case 'screenshot':     doScreenshot(); break;
-                case 'record_start':   doRecord(data.duration_ms ?? 5000); break;
-                case 'download_file':  downloadUrl(data.url, data.filename); break;
-                case 'download_text':  downloadText(data.content, data.filename); break;
+                case 'spin_start':    setSpin(true);  break;
+                case 'spin_stop':     setSpin(false); break;
+                case 'screenshot':    doScreenshot(); break;
+                case 'record_start':  doRecord(data.duration_ms ?? 5000); break;
+                case 'download_file': downloadUrl(data.url, data.filename); break;
+                case 'download_text': downloadText(data.content, data.filename); break;
               }
             } else {
-              const scene = MVSData.fromMVSJ(msg.data);
-              await loadMVS(viewer.plugin, scene, { replaceExisting: true });
+              try {
+                const scene = MVSData.fromMVSJ(msg.data);
+                await loadMVS(viewer.plugin, scene, { replaceExisting: true });
+              } catch (e) {
+                console.error('[molstar-mcp] loadMVS error:', e);
+              }
             }
           };
         }

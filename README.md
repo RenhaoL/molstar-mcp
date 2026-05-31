@@ -2,7 +2,7 @@
 
 > **Plain-English control of 3D protein structure visualization inside Claude Desktop — no extra software required.**
 
-Built in 2.5 days at a hackathon.
+Built in 2.5 days at the Scripps Research Hackathon 2026.
 
 ---
 

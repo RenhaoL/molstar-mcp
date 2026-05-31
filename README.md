@@ -22,11 +22,17 @@ This project fills that gap.
 
 `molstar-mcp` is a local [MCP](https://modelcontextprotocol.io) server that lets Claude Desktop drive a [Mol*](https://molstar.org) 3D structure viewer with plain English. The viewer runs in a browser tab — nothing to install beyond the server itself.
 
-```
-Claude Desktop ── stdio ──► server.py ── ws://localhost:8765 ──► index.html (Mol* viewer)
-  (MCP client)               (MCP server +                         (your browser)
-                              scene state +
-                              MVS builder)
+```mermaid
+flowchart LR
+    U(["👤 Researcher\nplain English"])
+    CD["🖥️ Claude Desktop\nMCP client"]
+    S["⚙️ server.py\nMCP server · scene state\nMVS JSON builder"]
+    V["🌐 index.html\nMol* viewer\nin your browser"]
+
+    U -->|chat| CD
+    CD -->|"stdio · tool calls"| S
+    S -->|"WebSocket :8765\nMVSJ scene JSON"| V
+    V -->|renders| U
 ```
 
 The server maintains a scene state, converts it into a [MolViewSpec](https://molstar.org/mol-view-spec-docs/) (MVSJ) scene on every change, and pushes it over a WebSocket. The browser receives it and redraws — no Mol* internals touched.
